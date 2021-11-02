@@ -34,6 +34,22 @@ void atend() {
     alarm_flag = 1;
 }
 
+int read_message(int fd, char * message) {
+    int res, message_index = 0;
+    while (alarm_flag == 0) {
+        res = read(fd, message + message_index, 1);
+        if (message[message_index] != FLAG && message_index == 0) continue;
+        else if (message[message_index] == FLAG && message_index == 4) {
+            message_index = 0;
+            return 0;
+        }
+        else {
+            message_index++;
+        }
+    }
+    return 1;
+}
+
 int llopen(int fd, int state) {
     if (state != RECEIVER && state != TRANSMITER) return 1;
 
@@ -44,23 +60,14 @@ int llopen(int fd, int state) {
     signal(SIGALRM, atend);
 
     if (state == TRANSMITER) {
-        int res, message_index = 0;
-
         while (alarm_count < 3) {
             if (alarm_flag == 1) {
                 write(fd, message, 5);
                 alarm(3);
                 alarm_flag = 0;
             }
-            res = read(fd, message + message_index, 1);
-            if (message[message_index] != FLAG && message_index == 0) continue;
-            else if (message[message_index] == FLAG && message_index == 4) {
-                message_index = 0;
-                break;
-            }
-            else {
-                message_index++;
-            }
+
+            if (!read_message(fd, message)) break;
         }
 
         if ((message[CNTRL] ^ message[ADDR]) != message[PROTEC]) {
@@ -70,19 +77,9 @@ int llopen(int fd, int state) {
     }
 
     else if (state == RECEIVER) {
-        int res, message_index = 0;
+        alarm_flag = 0;
 
-        while (true) {
-            res = read(fd, message + message_index, 1);
-            if (message[message_index] != FLAG && message_index == 0) continue;
-            else if (message[message_index] == FLAG && message_index == 4) {
-                message_index = 0;
-                break;
-            }
-            else {
-                message_index++;
-            }
-        }
+        read_message(fd, message);
 
         if ((message[CNTRL] ^ message[ADDR]) != message[PROTEC]) {
             printf("Parity error\n");
