@@ -8,92 +8,20 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
-#include <signal.h>
 #include <stdbool.h>
+
+#include "llapi.h"
+
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
-#define RECEIVER 0x00
-#define TRANSMITER 0x01
-#define FLAG 0x7E
-#define SET 0x03
-#define UA 0x07
-#define ADDR_STANDIN 0x03
-#define CNTRL 2
-#define ADDR 1
-#define PROTEC 3
 
 volatile int STOP=FALSE;
 
-int alarm_flag = 1, alarm_count = 0;
-
-void atend() {
-    printf("Alarm #%d\n", ++alarm_count);
-    alarm_flag = 1;
-}
-
-int read_message(int fd, char * message) {
-    int res, message_index = 0;
-    while (alarm_flag == 0) {
-        res = read(fd, message + message_index, 1);
-        if (message[message_index] != FLAG && message_index == 0) continue;
-        else if (message[message_index] == FLAG && message_index == 4) {
-            message_index = 0;
-            return 0;
-        }
-        else {
-            message_index++;
-        }
-    }
-    return 1;
-}
-
-int llopen(int fd, int state) {
-    if (state != RECEIVER && state != TRANSMITER) return 1;
-
-    char message[5] = {FLAG, ADDR_STANDIN, SET, SET ^ ADDR_STANDIN, FLAG};
-
-    alarm(0);
-
-    signal(SIGALRM, atend);
-
-    if (state == TRANSMITER) {
-        while (alarm_count < 3) {
-            if (alarm_flag == 1) {
-                write(fd, message, 5);
-                alarm(3);
-                alarm_flag = 0;
-            }
-
-            if (!read_message(fd, message)) break;
-        }
-
-        if ((message[CNTRL] ^ message[ADDR]) != message[PROTEC]) {
-            printf("Parity error\n");
-            return 1;
-        }
-    }
-
-    else if (state == RECEIVER) {
-        alarm_flag = 0;
-
-        read_message(fd, message);
-
-        if ((message[CNTRL] ^ message[ADDR]) != message[PROTEC]) {
-            printf("Parity error\n");
-            return 1;
-        }
-
-        message[CNTRL] = UA;
-        message[PROTEC] = message[CNTRL] ^ message[ADDR];
-
-        write(fd, message, 5);
-    }
-
-    alarm(0);
-}
+int alarm_flag = 1;
+int alarm_count = 0;
 
 int main(int argc, char** argv)
 {
