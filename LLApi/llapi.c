@@ -21,7 +21,7 @@ int llopen(int fd, int state) {
             if (!read_message(fd, message)) break;
         }
 
-        if ((message[CNTRL] ^ message[ADDR]) != message[PROTEC]) {
+        if ((message[ICTRL] ^ message[IADDR]) != message[IBBC1]) {
             printf("Parity error\n");
             return -1;
         }
@@ -32,13 +32,13 @@ int llopen(int fd, int state) {
 
         read_message(fd, message);
 
-        if ((message[CNTRL] ^ message[ADDR]) != message[PROTEC]) {
+        if ((message[ICTRL] ^ message[IADDR]) != message[IBBC1]) {
             printf("Parity error\n");
             return -1;
         }
 
-        message[CNTRL] = UA;
-        message[PROTEC] = message[CNTRL] ^ message[ADDR];
+        message[ICTRL] = UA;
+        message[IBBC1] = message[ICTRL] ^ message[IADDR];
 
         write(fd, message, 5);
     }
@@ -47,7 +47,41 @@ int llopen(int fd, int state) {
     return fd;
 }
 
+int llread(int fd, char* buffer) {
+	char trama[2048];
+	int trama_index = 0;
+	
+	while(true) {
+		int res = read(fd, trama + trama_index, 1);
+		
+		if( trama[trama_index] != FLAG && trama_index == 0) continue;
+		if( trama[trama_index] == FLAG ) 
+			if( trama_index != 0) break;
+			
+		trama_index++;
+	}
+	
+	// Check BCC1
+	
+	if ((trama[ICTRL] ^ trama[IADDR]) != trama[IBBC1]) {
+		// Nao envia nada e voltar a ler
+	}
+	
+	// Check BCC2
+	
+	
+	
+	
+	
+	
+}
 
+int llwrite(int fd, char* buffer, int length) {
+	
+}
+
+
+// EStabelecer ligaçao
 int read_message(int fd, char * message) {
     int res, message_index = 0;
     while (alarm_flag == 0) {
@@ -63,4 +97,15 @@ int read_message(int fd, char * message) {
     }
     return 1;
 }
+
+
+
+// Ler dados
+
+int read_data () {
+	
+	
+	
+}
+
 

@@ -3,6 +3,7 @@
 
 
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -14,9 +15,10 @@
 #define SET 0x03
 #define UA 0x07
 #define ADDR_STANDIN 0x03
-#define ADDR 1
-#define CNTRL 2
-#define PROTEC 3
+#define IADDR 1
+#define ICTRL 2
+#define IBBC1 3
+
 
 extern int alarm_flag;
 extern int alarm_count;
@@ -27,6 +29,10 @@ extern int alarm_count;
  * 
  */
 int llopen(int fd, int state);
+
+int llread(int fd, char* buffer);
+
+int llwrite(int fd, char* buffer, int length);
 
 
 /**
