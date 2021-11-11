@@ -94,10 +94,11 @@ int main(int argc, char** argv)
         if((fd_file = open("pinguim.gif", O_RDONLY)) < 0) 
             printf("Error on finding ...\n");
 
-        while(read(fd_file, buffer_file, 1) > 0) 
+        while(read(fd_file, buffer_file + buffer_file_size, 1) > 0) {
             buffer_file_size++;
+        }
 
-        llwrite(fd, buffer_file, buffer_file_size);
+        llwrite(fd, buffer_file, buffer_file_size + 1);
         printf("Written\n");   
 
         close(fd_file);

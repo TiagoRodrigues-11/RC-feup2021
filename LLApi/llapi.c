@@ -48,89 +48,118 @@ int llopen(int fd, int state) {
 }
 
 int llread(int fd, char* buffer) {
+    char *trama = (char *)malloc(sizeof(char)* 32768);
 	char *stuffed = (char *)malloc(sizeof(char)* 32768);
     char *destuffed = (char *)malloc(sizeof(char)* 32768);
-	int stuffed_index = 0, destuffed_index = 0;
+	int stuffed_size = 0, destuffed_size = 0, trama_index = 0;
+    int while_counter = 0;
 
 	while(true) {
-		int res = read(fd, stuffed + stuffed_index, 1);
+        while_counter++;
+
+		int res = read(fd, trama + trama_index, 1);
 		
-		if( stuffed[stuffed_index] != FLAG && stuffed_index == 0) continue;
-		if( stuffed[stuffed_index] == FLAG ) 
-			if( stuffed_index != 0) break;
-			
-		stuffed_index++;
+		if( trama[trama_index] != FLAG && trama_index == 0) continue;
+
+		if( trama[trama_index] == FLAG && trama_index != 0) break;
+
+        trama_index++;
 	}
+
+    printf("While counter: %d\n", while_counter);
 	
 	// Check BCC1
 	
-	if ((stuffed[ICTRL] ^ stuffed[IADDR]) != stuffed[IBBC1]) {
+	if ((trama[ICTRL] ^ trama[IADDR]) != trama[IBBC1]) {
 		// Nao envia nada e voltar a ler
+        printf("BCC1 Bad\n");
 	}
+
+    // Get stuffed data
+
+    memcpy(stuffed, trama + 4, trama_index - 4);
+
+    stuffed_size = trama_index - 5;
 	
     // Byte Destuffing 
 
-    for(int i = 4, j = 5; j < stuffed_index; i++, j++, destuffed_index++) {
-        if(stuffed[i] == 0x7d && stuffed[j] == 0x5e) {
-            destuffed[destuffed_index] = 0x7e;
+    for (int i = 0, j = 1; i < stuffed_size; i++, j++) {
+        if (j == stuffed_size) destuffed[destuffed_size] = stuffed[i];
+        else if (stuffed[i] == 0x7D && stuffed[j] == 0x5D) {
+            destuffed[destuffed_size] = 0x7D;
             i++; j++;
-        } else if (stuffed[i] == 0x7d && stuffed[j] == 0x5d) {
-            destuffed[destuffed_index] = 0x7d;
-            i++;j++;
-        } else {
-            destuffed[destuffed_index] = stuffed[i];
         }
+        else if (stuffed[i] == 0x7D && stuffed[j] == 0x5E) {
+            destuffed[destuffed_size] = 0x7E;
+            i++; j++;
+        }
+        else
+            destuffed[destuffed_size] = stuffed[i];
+        destuffed_size++;
     }
 
     free(stuffed);
 
 	// Check BCC2 
 
-    char xordata = destuffed[4];
+    char xordata = destuffed[0];
 
-    for(int i = 5; i < destuffed_index; i++) {
+    for(int i = 1; i < destuffed_size - 1; i++) {
         xordata = xordata ^ destuffed[i];
     }
 	
-    if (xordata != destuffed[destuffed_index]) {
+    if (xordata != destuffed[destuffed_size - 1]) {
 		// Mandar um REJ
+        printf("BCC2 Bad\n");
 	}
 
-    memcpy(buffer, destuffed, (destuffed_index + 1) * sizeof(char));
+    memcpy(buffer, destuffed, (destuffed_size + 1) * sizeof(char));
 
 	free(destuffed);
 
 	// Quando da certo enviar um RR
 
 
-    return destuffed_index + 1;
+    return destuffed_size + 1;
 }
 
 int llwrite(int fd, char* buffer, int length) {
+    char *unstuffed = (char *)malloc(sizeof(char)* 32768);
     char *stuffed = (char *)malloc(sizeof(char)* 32768);
     char *trama = (char *)malloc(sizeof(char)* 32768);
     int stuffed_index = 0;
+
+    // Fill Unstuffed
+
+    for (int i = 0; i < length; i++) unstuffed[i] = buffer[i];
     
     // BCC2
 
     char bcc2 = buffer[0];
-    for(int i = 1; i < length + 1; i++) {
+    for (int i = 1; i < length + 1; i++) {
         bcc2 = bcc2 ^ buffer[i];
     }
 
-    // Byte stuffing
+    unstuffed[length] = bcc2;
 
-    for(int i = 0; i < length +1; i++, stuffed_index++) {
-        if(buffer[i] == 0x7e) {
-            stuffed[stuffed_index++] = 0x7d;
-            stuffed[stuffed_index] = 0x5e;
-        } else if (buffer[i] == 0x7d) {
-            stuffed[stuffed_index++] = 0x7d;
-            stuffed[stuffed_index] = 0x5d;
-        } else {
-            stuffed[stuffed_index] = stuffed[i];
+    // Stuff
+
+    for (int i = 0; i < length + 1; i++, stuffed_index++) {
+        if (unstuffed[i] == 0x7E) {
+            stuffed[stuffed_index++] = 0x7D;
+            stuffed[stuffed_index] = 0x5E;
+        }
+        else if (unstuffed[i] == 0x7D) {
+            stuffed[stuffed_index++] = 0x7D;
+            stuffed[stuffed_index] = 0x5D;
+        }
+        else {
+            stuffed[stuffed_index] = unstuffed[i];
         }
     }
+
+    free(unstuffed);
+
 
     // Setup Trama
     char temp_C = 0x00;
@@ -139,12 +168,17 @@ int llwrite(int fd, char* buffer, int length) {
     trama[2] = temp_C;
     trama[3] = ADDR ^ temp_C;
     memcpy(trama + 4 * sizeof(char), stuffed, (stuffed_index + 1) * sizeof(char));
-    trama[5 + stuffed_index] = bcc2;
-    trama[6 + stuffed_index] = FLAG;
+    trama[5 + stuffed_index] = FLAG;
 
-    write(fd, trama, stuffed_index + 7);
+    free(stuffed);
 
-    return stuffed_index + 7;
+    int temp = write(fd, trama, stuffed_index + 6);
+
+    printf("Bytes written: %d\n", temp);
+
+    free(trama);
+
+    return stuffed_index + 6;
 
 }
 
