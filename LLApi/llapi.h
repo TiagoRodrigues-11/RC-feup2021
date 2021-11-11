@@ -5,6 +5,8 @@
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "alarm.h"
@@ -14,7 +16,7 @@
 #define FLAG 0x7E
 #define SET 0x03
 #define UA 0x07
-#define ADDR_STANDIN 0x03
+#define ADDR 0x03
 #define IADDR 1
 #define ICTRL 2
 #define IBBC1 3

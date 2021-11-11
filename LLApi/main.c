@@ -85,6 +85,40 @@ int main(int argc, char** argv)
        
     llopen(fd, state);
 
+    printf("Establish connection\n");
+
+    if(state == TRANSMITER) {
+        int fd_file, buffer_file_size = 0;
+        char *buffer_file = (char *)malloc(sizeof(char)* 32768);
+
+        if((fd_file = open("pinguim.gif", O_RDONLY)) < 0) 
+            printf("Error on finding ...\n");
+
+        while(read(fd_file, buffer_file, 1) > 0) 
+            buffer_file_size++;
+
+        llwrite(fd, buffer_file, buffer_file_size);
+        printf("Written\n");   
+
+        close(fd_file);
+        free(buffer_file);
+
+    } else {
+        char *buffer_file = (char *)malloc(sizeof(char)* 32768);
+
+        int buffer_size = llread(fd, buffer_file);
+        int fd_file;
+
+        if((fd_file = open("result.gif", O_RDWR | O_CREAT, 0777)) < 0) 
+            printf("Error on finding ...\n");
+
+        write(fd_file, buffer_file, buffer_size);
+        
+        
+        close(fd_file);
+        free(buffer_file);
+
+    }
 
     /*
     O ciclo WHILE deve ser alterado de modo a respeitar o indicado no guião
@@ -94,3 +128,20 @@ int main(int argc, char** argv)
     close(fd);
     return 0;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// End of file
