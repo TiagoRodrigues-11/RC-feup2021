@@ -1,7 +1,9 @@
 #ifndef LLAPI_H
 #define LLAPI_H
 
-
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>

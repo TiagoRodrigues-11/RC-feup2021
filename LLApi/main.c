@@ -31,11 +31,11 @@ int main(int argc, char** argv)
 
     int state = strcmp(argv[1], "T") == 0 ? TRANSMITER : RECEIVER;
 
-    printf("%d\n", state);
-
     if ( (argc < 3) ||
-         ((strcmp("/dev/ttyS10", argv[2])!=0) &&
-          (strcmp("/dev/ttyS11", argv[2])!=0) )) {
+         ((strcmp("/dev/ttyS0", argv[2])!=0) && 
+          (strcmp("/dev/ttyS1", argv[2])!=0) &&
+          (strcmp("/dev/ttyS11", argv[2])!=0) && 
+          (strcmp("/dev/ttyS10", argv[2])!=0))) {
         printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
@@ -89,9 +89,9 @@ int main(int argc, char** argv)
 
     if(state == TRANSMITER) {
         int fd_file, buffer_file_size = 0;
-        char *buffer_file = (char *)malloc(sizeof(char)* 32768);
+        char *buffer_file = (char *)malloc(sizeof(char)* 4*32768);
 
-        if((fd_file = open("pinguim.gif", O_RDONLY)) < 0) 
+        if((fd_file = open("result.gif", O_RDONLY)) < 0) 
             printf("Error on finding ...\n");
 
         while(read(fd_file, buffer_file + buffer_file_size, 1) > 0) {
@@ -105,7 +105,7 @@ int main(int argc, char** argv)
         free(buffer_file);
 
     } else {
-        char *buffer_file = (char *)malloc(sizeof(char)* 32768);
+        char *buffer_file = (char *)malloc(sizeof(char)* 4*32768);
 
         int buffer_size = llread(fd, buffer_file);
         int fd_file;
@@ -129,8 +129,6 @@ int main(int argc, char** argv)
     close(fd);
     return 0;
 }
-
-
 
 
 
