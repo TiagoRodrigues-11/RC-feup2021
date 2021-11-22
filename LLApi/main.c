@@ -68,7 +68,9 @@ int transmit(int fd, char * filename) {
 
     // DATA
     char read_data[PACKET_SIZE];
-    char read_size;
+    int read_size;
+
+    int c = 0;
 
     while (true)
     {
@@ -79,25 +81,29 @@ int transmit(int fd, char * filename) {
 
             printf("File size: %ld\n", st.st_size);
 
-            read_size = read(fd_file, read_data, PACKET_SIZE);
+            read_size = 0;
+
+            for (; read_size < PACKET_SIZE; read_size++) {
+                if (read(fd_file, read_data + read_size, 1) == 0) break;
+            }
 
             if (read_size == 0) {
                 printf("File over.\n");
                 break;
             }
-            else {
-                printf("Read: %d\n", read_size);
-            }
 
             packet[C] = DATA;
             packet[N] = 0;
-            packet[L2] = read_size / 255;
-            packet[L1] = read_size % 255;
+            packet[L2] = (unsigned char) (read_size / 256);
+            packet[L1] = (unsigned char) (read_size % 256);
+
+            printf("Last packet: 0x%02x\n", packet[read_size + 2]);
 
             memcpy(packet + D, read_data, read_size);
         }
 
         llwrite(fd, packet, read_size + 4);
+        c++;
     }
     
 
@@ -117,11 +123,13 @@ int transmit(int fd, char * filename) {
 int receive(int fd) {
     int fd_file, status = WAITING;
 
+    int c = 0;
+
     while (true) {
         char packet[1024];
         int bytes_read = llread(fd, packet);
 
-        printf("llread executed %d\n\n", packet[C]);
+        printf("llread executed C=%d\n\n", packet[C]);
 
         if (status == WAITING && packet[C] == START) {
             char filename[256];
@@ -142,15 +150,17 @@ int receive(int fd) {
         }
 
         else if (status == WRITING && packet[C] == DATA) {
-            int data_size = (int) packet[L2] * 255 + packet[L1];
-            write(fd_file, packet + 4, data_size);
+            unsigned char l2 = packet[L2], l1 = packet[L1];
+            int res = l2 * 256 + l1;
+            write(fd_file, packet + 4, res);
         }
 
         else {
-            printf("Catastrophe!");
+            printf("Catastrophe!\n");
             close(fd_file);
             return -1;
         }
+        c++;
     }
 }
 
