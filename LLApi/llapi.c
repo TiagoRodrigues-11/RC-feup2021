@@ -48,9 +48,9 @@ int llopen(int fd, int state) {
 }
 
 int llread(int fd, char* buffer) {
-    char *trama = (char *)malloc(sizeof(char)* 32768);
-	char *stuffed = (char *)malloc(sizeof(char)* 32768);
-    char *destuffed = (char *)malloc(sizeof(char)* 32768);
+    char *trama = (char *)malloc(sizeof(char)* 1024);
+	char *stuffed = (char *)malloc(sizeof(char)* 1024);
+    char *destuffed = (char *)malloc(sizeof(char)* 1024);
 	int stuffed_size = 0, destuffed_size = 0, trama_index = 0;
     int while_counter = 0;
 
@@ -66,7 +66,6 @@ int llread(int fd, char* buffer) {
         trama_index++;
 	}
 
-    printf("While counter: %d\n", while_counter);
 	
 	// Check BCC1
 	
@@ -80,7 +79,7 @@ int llread(int fd, char* buffer) {
     memcpy(stuffed, trama + 4, trama_index - 4);
 
     stuffed_size = trama_index - 5;
-	
+
     // Byte Destuffing 
 
     for (int i = 0, j = 1; i < stuffed_size; i++, j++) {
@@ -113,20 +112,20 @@ int llread(int fd, char* buffer) {
         printf("BCC2 Bad\n");
 	}
 
-    memcpy(buffer, destuffed, (destuffed_size + 1) * sizeof(char));
-
+    memcpy(buffer, destuffed, (destuffed_size-2) * sizeof(char));
+    
 	free(destuffed);
 
 	// Quando da certo enviar um RR
 
 
-    return destuffed_size + 1;
+    return destuffed_size -2;
 }
 
 int llwrite(int fd, char* buffer, int length) {
-    char *unstuffed = (char *)malloc(sizeof(char)* 32768);
-    char *stuffed = (char *)malloc(sizeof(char)* 32768);
-    char *trama = (char *)malloc(sizeof(char)* 32768);
+    char *unstuffed = (char *)malloc(sizeof(char)* 1024);
+    char *stuffed = (char *)malloc(sizeof(char)* 1024);
+    char *trama = (char *)malloc(sizeof(char)* 1024);
     int stuffed_index = 0;
 
     // Fill Unstuffed
@@ -136,8 +135,8 @@ int llwrite(int fd, char* buffer, int length) {
     // BCC2
 
     char bcc2 = buffer[0];
-    for (int i = 1; i < length + 1; i++) {
-        bcc2 = bcc2 ^ buffer[i];
+    for (int i = 1; i < length; i++) {
+        bcc2 ^= buffer[i];
     }
 
     unstuffed[length] = bcc2;
@@ -173,8 +172,6 @@ int llwrite(int fd, char* buffer, int length) {
     free(stuffed);
 
     int temp = write(fd, trama, stuffed_index + 6);
-
-    printf("Bytes written: %d\n", temp);
 
     free(trama);
 

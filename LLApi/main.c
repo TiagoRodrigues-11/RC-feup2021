@@ -12,16 +12,147 @@
 
 #include "llapi.h"
 
-
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
+#define PACKET_SIZE 256
+#define WAITING 0
+#define WRITING 1
+#define DATA 0x01
+#define START 0x02
+#define END 0x03
+#define C 0
+#define N 1
+#define L2 2
+#define L1 3
+#define D 4
 
 volatile int STOP=FALSE;
 
 int alarm_flag = 1;
 int alarm_count = 0;
+
+void extract_filename(char * packet, char * filename) {
+    int size = packet[1];
+
+    for (int i = 0; i < size; i++) {
+        filename[i] = packet[2 + i];
+    }
+}
+
+int make_start_packet(char * filename, char * packet) {
+    char size = (char) (strlen(filename) + 1);
+    packet[C] = START;
+    packet[1] = size;
+    memcpy(packet + 2, filename, size);
+
+    return size + 2;
+}
+
+int transmit(int fd, char * filename) {
+    int fd_file;
+    struct stat file_stat;
+    char packet[1024];
+    int size = make_start_packet(filename, packet), n = 0;
+    char msg[256];
+
+    printf("%s\n", filename);
+
+    if((fd_file = open(filename, O_RDWR)) < 0) perror("Error opening file: ");
+
+    printf("Writing file. Packet size: %d\n", PACKET_SIZE);
+
+    // START
+    llwrite(fd, packet, size);
+
+    // DATA
+    char read_data[PACKET_SIZE];
+    char read_size;
+
+    while (true)
+    {
+        if (true) {
+            struct stat st;
+
+            stat(filename, &st);
+
+            printf("File size: %ld\n", st.st_size);
+
+            read_size = read(fd_file, read_data, PACKET_SIZE);
+
+            if (read_size == 0) {
+                printf("File over.\n");
+                break;
+            }
+            else {
+                printf("Read: %d\n", read_size);
+            }
+
+            packet[C] = DATA;
+            packet[N] = 0;
+            packet[L2] = read_size / 255;
+            packet[L1] = read_size % 255;
+
+            memcpy(packet + D, read_data, read_size);
+        }
+
+        llwrite(fd, packet, read_size + 4);
+    }
+    
+
+    // END
+    size = make_start_packet(filename, packet);
+    packet[C] = END;
+
+    llwrite(fd, packet, size);
+
+    printf("Finished writing file\n");
+
+    close(fd_file);
+
+    return 0;
+}
+
+int receive(int fd) {
+    int fd_file, status = WAITING;
+
+    while (true) {
+        char packet[1024];
+        int bytes_read = llread(fd, packet);
+
+        printf("llread executed %d\n\n", packet[C]);
+
+        if (status == WAITING && packet[C] == START) {
+            char filename[256];
+
+            extract_filename(packet, filename);
+
+            unlink(filename);
+
+            if((fd_file = open(filename, O_RDWR | O_CREAT, 0777)) < 0) perror("Error creating new file: ");
+
+            status = WRITING;
+        }
+
+        else if (status == WRITING && packet[C] == END) {
+            printf("Closed\n");
+            close(fd_file);
+            return 0;
+        }
+
+        else if (status == WRITING && packet[C] == DATA) {
+            int data_size = (int) packet[L2] * 255 + packet[L1];
+            write(fd_file, packet + 4, data_size);
+        }
+
+        else {
+            printf("Catastrophe!");
+            close(fd_file);
+            return -1;
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
@@ -31,11 +162,11 @@ int main(int argc, char** argv)
 
     int state = strcmp(argv[1], "T") == 0 ? TRANSMITER : RECEIVER;
 
-    printf("%d\n", state);
-
-    if ( (argc < 3) ||
+    if ( (argc < 3 && state == RECEIVER) || (argc < 4 && state == TRANSMITER) ||
          ((strcmp("/dev/ttyS10", argv[2])!=0) &&
-          (strcmp("/dev/ttyS11", argv[2])!=0) )) {
+          (strcmp("/dev/ttyS11", argv[2])!=0) &&
+          (strcmp("/dev/ttyS1", argv[2])!=0) &&
+          (strcmp("/dev/ttyS0", argv[2])!=0))) {
         printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
@@ -88,37 +219,9 @@ int main(int argc, char** argv)
     printf("Establish connection\n");
 
     if(state == TRANSMITER) {
-        int fd_file, buffer_file_size = 0;
-        char *buffer_file = (char *)malloc(sizeof(char)* 32768);
-
-        if((fd_file = open("pinguim.gif", O_RDONLY)) < 0) 
-            printf("Error on finding ...\n");
-
-        while(read(fd_file, buffer_file + buffer_file_size, 1) > 0) {
-            buffer_file_size++;
-        }
-
-        llwrite(fd, buffer_file, buffer_file_size + 1);
-        printf("Written\n");   
-
-        close(fd_file);
-        free(buffer_file);
-
+        transmit(fd, argv[3]);
     } else {
-        char *buffer_file = (char *)malloc(sizeof(char)* 32768);
-
-        int buffer_size = llread(fd, buffer_file);
-        int fd_file;
-
-        if((fd_file = open("result.gif", O_RDWR | O_CREAT, 0777)) < 0) 
-            printf("Error on finding ...\n");
-
-        write(fd_file, buffer_file, buffer_size);
-        
-        
-        close(fd_file);
-        free(buffer_file);
-
+        receive(fd);
     }
 
     /*
@@ -129,20 +232,4 @@ int main(int argc, char** argv)
     close(fd);
     return 0;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 // End of file
