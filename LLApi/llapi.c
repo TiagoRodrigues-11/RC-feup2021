@@ -180,42 +180,38 @@ int llwrite(int fd, char* buffer, int length) {
     memcpy(trama + 4 * sizeof(char), stuffed, (stuffed_index + 1) * sizeof(char));
     trama[5 + stuffed_index] = FLAG;
 
-    char ans[5];
+    unsigned char ans[5];
     int tries = 0;
 
     // ACK handling
     while (tries < 3) {
         int temp = write(fd, trama, stuffed_index + 6);
         read_message(fd, ans);
+        unsigned char t = (ans[IADDR] ^ ans[ICTRL]);
 
-        for(int i = 0; i <stuffed_index + 6 ; i++) {
-            printf("0x%02x \t", trama[i]);
-        }
-        printf("\n");
-        for(int i = 0; i < 5; i++) {
-            printf("0x%02x \t", ans[i]);
-        }
-        printf("\n");
-
-        printf("0x%02x \t", ans[IADDR] ^ ans[ICTRL]);
-        printf("0x%02x \n", ans[IBCC1]);
-
-        if ((ans[IADDR] ^ ans[ICTRL]) != ans[IBCC1]) {
+        if (t != ans[IBCC1]) {
             printf("ACK - BCC1 bad\n");
             tries++;
             continue;
         }
 
-        if (ans[ICTRL] == REJ(llwrite_start ? 0 : 1)) {
+        t = REJ(llwrite_start ? 0 : 1);
+
+        if (ans[ICTRL] == t) {
             printf("ACK - REJ\n");
             tries++;
             continue;
         }
-        else if (ans[ICTRL] == RR(llwrite_start ? 0 : 1)) {
+
+        t = RR(llwrite_start ? 0 : 1);
+
+        if (ans[ICTRL] == t) {
             printf("ACK - RR\n");
             llwrite_start = llwrite_start ? 0 : 1;
             break;
         }
+
+        tries++;
     }
 
     free(trama);

@@ -20,8 +20,8 @@
 #define IADDR 1
 #define ICTRL 2
 #define IBCC1 3
-#define RR(n) (n << 7 | 0x05)
-#define REJ(n) (n << 7 | 0x01)
+#define RR(n) ((n << 7) | 0x05)
+#define REJ(n) ((n << 7) | 0x01)
 
 extern int alarm_flag;
 extern int alarm_count;
