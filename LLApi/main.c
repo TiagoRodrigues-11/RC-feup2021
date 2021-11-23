@@ -70,6 +70,8 @@ int transmit(int fd, char * filename) {
     char read_data[PACKET_SIZE];
     int read_size;
 
+    int c = 0;
+
     while (true)
     {
         if (true) {
@@ -87,7 +89,7 @@ int transmit(int fd, char * filename) {
             }
 
             packet[C] = DATA;
-            packet[N] = 0;
+            packet[N] = c % 256;
             packet[L2] = (unsigned char) (read_size / 256);
             packet[L1] = (unsigned char) (read_size % 256);
 
@@ -97,6 +99,7 @@ int transmit(int fd, char * filename) {
         }
 
         llwrite(fd, packet, read_size + 5);
+        c++;
     }
     
 
