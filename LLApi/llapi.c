@@ -1,13 +1,53 @@
 
 #include "llapi.h"
 
-
+struct termios oldtio,newtio;
 
 char llwrite_start = 0;
 char llread_start = 1;
 
-int llopen(int fd, int state) {
+int llopen(int port, int state) {
     if (state != RECEIVER && state != TRANSMITER) return 1;
+
+    char serial[256];
+    snprintf(serial, 256, "/dev/ttyS%d", port);
+
+
+    int fd = open(serial, O_RDWR | O_NOCTTY );
+    if (fd < 0) { perror(serial); return(-1); }
+
+    /*
+    Open serial port device for reading and writing and not as controlling tty
+    because we don't want to get killed if linenoise sends CTRL-C.
+    */
+
+    if (tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
+        perror("tcgetattr");
+        exit(-1);
+    }
+
+    bzero(&newtio, sizeof(newtio));
+    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    newtio.c_iflag = IGNPAR;
+    newtio.c_oflag = 0;
+
+    /* set input mode (non-canonical, no echo,...) */
+    newtio.c_lflag = 0;
+
+    newtio.c_cc[VTIME]    = 100;   /* inter-character timer unused */
+    newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
+
+    /*
+    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
+    leitura do(s) próximo(s) caracter(es)
+    */
+
+    tcflush(fd, TCIOFLUSH);
+
+    if (tcsetattr(fd,TCSANOW, &newtio) == -1) {
+        perror("tcsetattr");
+        exit(-1);
+    }
 
     unsigned char message[5] = {FLAG, ADDR, SET, SET ^ ADDR, FLAG};
 
@@ -34,9 +74,7 @@ int llopen(int fd, int state) {
 
     else if (state == RECEIVER) {
         alarm_flag = 0;
-
         read_message(fd, message);
-
         if ((message[ICTRL] ^ message[IADDR]) != message[IBCC1]) {
             printf("Parity error\n");
             return -1;
@@ -50,6 +88,11 @@ int llopen(int fd, int state) {
 
     alarm(0);
     return fd;
+}
+
+int llclose(int fd) {
+    tcsetattr(fd,TCSANOW,&oldtio);
+    close(fd);
 }
 
 int llread(int fd, char* buffer) {
@@ -107,18 +150,13 @@ int llread(int fd, char* buffer) {
         }
 
 
-        printf("0x%02x\t", xordata);
-        printf("0x%02x\n", destuffed[destuffed_size - 1]);
-
         if (xordata != destuffed[destuffed_size - 1]) {
-            printf("REJ\n");
             unsigned char temp = REJ(llread_start);
             unsigned char msg[5] = {FLAG, ADDR, temp, ADDR ^ temp, FLAG};
 
             write(fd, msg, 5);
             continue;
         } else {
-            printf("RR\n");
             unsigned char temp = RR(llread_start);
             unsigned char msg[5] = {FLAG, ADDR, temp, ADDR ^ temp, FLAG};
             
@@ -190,7 +228,6 @@ int llwrite(int fd, char* buffer, int length) {
         unsigned char t = (ans[IADDR] ^ ans[ICTRL]);
 
         if (t != ans[IBCC1]) {
-            printf("ACK - BCC1 bad\n");
             tries++;
             continue;
         }
@@ -198,7 +235,6 @@ int llwrite(int fd, char* buffer, int length) {
         t = REJ(llwrite_start ? 0 : 1);
 
         if (ans[ICTRL] == t) {
-            printf("ACK - REJ\n");
             tries++;
             continue;
         }
@@ -206,7 +242,6 @@ int llwrite(int fd, char* buffer, int length) {
         t = RR(llwrite_start ? 0 : 1);
 
         if (ans[ICTRL] == t) {
-            printf("ACK - RR\n");
             llwrite_start = llwrite_start ? 0 : 1;
             break;
         }
@@ -239,15 +274,3 @@ int read_message(int fd, unsigned char * message) {
     }
     return 1;
 }
-
-
-
-// Ler dados
-
-int read_data () {
-	
-	
-	
-}
-
-

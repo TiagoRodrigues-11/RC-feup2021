@@ -12,7 +12,6 @@
 
 #include "llapi.h"
 
-#define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
@@ -81,7 +80,6 @@ int transmit(int fd, char * filename) {
                 if (read(fd_file, read_data + read_size, 1) == 0) break;
             }
 
-            printf("read_size: %d\n",read_size);
 
             if (read_size == 0) {
                 printf("File over.\n");
@@ -94,8 +92,6 @@ int transmit(int fd, char * filename) {
             packet[L1] = (unsigned char) (read_size % 256);
 
             memcpy(packet + D, read_data, read_size);
-
-            printf("Last packet: 0x%02x\n", packet[read_size + 3]);
         }
 
         llwrite(fd, packet, read_size + 5);
@@ -123,8 +119,6 @@ int receive(int fd) {
         char packet[1024];
         int bytes_read = llread(fd, packet);
 
-        printf("llread executed C=%d\n\n", packet[C]);
-
         if (status == WAITING && packet[C] == START) {
             char filename[256];
 
@@ -138,7 +132,7 @@ int receive(int fd) {
         }
 
         else if (status == WRITING && packet[C] == END) {
-            printf("Closed\n");
+            printf("Finished receiving\n");
             close(fd_file);
             return 0;
         }
@@ -159,65 +153,25 @@ int receive(int fd) {
 
 int main(int argc, char** argv)
 {
-    int fd,c, res;
-    struct termios oldtio,newtio;
+    int fd, c, res, port;
     char buf[255];
 
     int state = strcmp(argv[1], "T") == 0 ? TRANSMITER : RECEIVER;
 
-    if ( (argc < 3 && state == RECEIVER) || (argc < 4 && state == TRANSMITER) ||
-         ((strcmp("/dev/ttyS10", argv[2])!=0) &&
-          (strcmp("/dev/ttyS11", argv[2])!=0) &&
-          (strcmp("/dev/ttyS1", argv[2])!=0) &&
-          (strcmp("/dev/ttyS0", argv[2])!=0))) {
+    if ((argc < 3 && state == RECEIVER) || (argc < 4 && state == TRANSMITER)) {
         printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
         exit(1);
     }
 
-
-    /*
-    Open serial port device for reading and writing and not as controlling tty
-    because we don't want to get killed if linenoise sends CTRL-C.
-    */
-
-
-    fd = open(argv[2], O_RDWR | O_NOCTTY );
-    if (fd < 0) { perror(argv[2]); exit(-1); }
-
-    if (tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
-        perror("tcgetattr");
-        exit(-1);
-    }
-
-    bzero(&newtio, sizeof(newtio));
-    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-    newtio.c_iflag = IGNPAR;
-    newtio.c_oflag = 0;
-
-    /* set input mode (non-canonical, no echo,...) */
-    newtio.c_lflag = 0;
-
-    newtio.c_cc[VTIME]    = 100;   /* inter-character timer unused */
-    newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
-
-    /*
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-    leitura do(s) próximo(s) caracter(es)
-    */
-
-
-    tcflush(fd, TCIOFLUSH);
-
-    if (tcsetattr(fd,TCSANOW,&newtio) == -1) {
-        perror("tcsetattr");
-        exit(-1);
-    }
+    sscanf(argv[2], "%d", &port);
 
     printf("New termios structure set\n");
 
     // Establish connection
        
-    llopen(fd, state);
+    fd = llopen(port, state);
+
+    if (fd < 0) exit(-1);
 
     printf("Establish connection\n");
 
@@ -227,12 +181,13 @@ int main(int argc, char** argv)
         receive(fd);
     }
 
+    printf("Closing\n");
+    llclose(fd);
+
     /*
     O ciclo WHILE deve ser alterado de modo a respeitar o indicado no guião
     */
 
-    tcsetattr(fd,TCSANOW,&oldtio);
-    close(fd);
     return 0;
 }
 // End of file

@@ -3,14 +3,19 @@
 
 
 #include <signal.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <termios.h>
 
 #include "alarm.h"
 
+#define BAUDRATE B38400
 #define RECEIVER 0x00
 #define TRANSMITER 0x01
 #define FLAG 0x7E
@@ -32,6 +37,8 @@ extern int alarm_count;
  * 
  */
 int llopen(int fd, int state);
+
+int llclose(int fd);
 
 int llread(int fd, char* buffer);
 
