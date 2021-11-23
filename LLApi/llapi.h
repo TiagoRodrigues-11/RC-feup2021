@@ -19,8 +19,9 @@
 #define ADDR 0x03
 #define IADDR 1
 #define ICTRL 2
-#define IBBC1 3
-
+#define IBCC1 3
+#define RR(n) (n << 7 | 0x05)
+#define REJ(n) (n << 7 | 0x01)
 
 extern int alarm_flag;
 extern int alarm_count;
@@ -41,7 +42,7 @@ int llwrite(int fd, char* buffer, int length);
  * @brief Read and verification of the message
  * 
  */
-int read_message(int fd, char * message);
+int read_message(int fd, unsigned char * message);
 
 
 #endif

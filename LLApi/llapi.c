@@ -1,8 +1,7 @@
 
 #include "llapi.h"
 
-#define RR(n) n << 7 | 0x05
-#define REJ(n) n << 7 | 0x01
+
 
 char llwrite_start = 0;
 char llread_start = 1;
@@ -10,7 +9,7 @@ char llread_start = 1;
 int llopen(int fd, int state) {
     if (state != RECEIVER && state != TRANSMITER) return 1;
 
-    char message[5] = {FLAG, ADDR, SET, SET ^ ADDR, FLAG};
+    unsigned char message[5] = {FLAG, ADDR, SET, SET ^ ADDR, FLAG};
 
     alarm(0);
 
@@ -27,7 +26,7 @@ int llopen(int fd, int state) {
             if (!read_message(fd, message)) break;
         }
 
-        if ((message[ICTRL] ^ message[IADDR]) != message[IBBC1]) {
+        if ((message[ICTRL] ^ message[IADDR]) != message[IBCC1]) {
             printf("Parity error\n");
             return -1;
         }
@@ -38,13 +37,13 @@ int llopen(int fd, int state) {
 
         read_message(fd, message);
 
-        if ((message[ICTRL] ^ message[IADDR]) != message[IBBC1]) {
+        if ((message[ICTRL] ^ message[IADDR]) != message[IBCC1]) {
             printf("Parity error\n");
             return -1;
         }
 
         message[ICTRL] = UA;
-        message[IBBC1] = message[ICTRL] ^ message[IADDR];
+        message[IBCC1] = message[ICTRL] ^ message[IADDR];
 
         write(fd, message, 5);
     }
@@ -73,7 +72,7 @@ int llread(int fd, char* buffer) {
 
         // Check BCC1
         
-        if ((trama[ICTRL] ^ trama[IADDR]) != trama[IBBC1]) {
+        if ((trama[ICTRL] ^ trama[IADDR]) != trama[IBCC1]) {
             continue;
         }
 
@@ -106,15 +105,23 @@ int llread(int fd, char* buffer) {
         for(int i = 1; i < destuffed_size - 1; i++) {
             xordata = xordata ^ destuffed[i];
         }
-        
+
+
+        printf("0x%02x\t", xordata);
+        printf("0x%02x\n", destuffed[destuffed_size - 1]);
+
         if (xordata != destuffed[destuffed_size - 1]) {
-            char msg[5] = {FLAG, ADDR, REJ(llread_start), ADDR ^ REJ(llread_start), FLAG};
+            printf("REJ\n");
+            unsigned char temp = REJ(llread_start);
+            unsigned char msg[5] = {FLAG, ADDR, temp, ADDR ^ temp, FLAG};
+
             write(fd, msg, 5);
             continue;
-        }
-
-        else {
-            char msg[5] = {FLAG, ADDR, RR(llread_start), ADDR ^ RR(llread_start), FLAG};
+        } else {
+            printf("RR\n");
+            unsigned char temp = RR(llread_start);
+            unsigned char msg[5] = {FLAG, ADDR, temp, ADDR ^ temp, FLAG};
+            
             write(fd, msg, 5);
             llread_start = llread_start ? 0 : 1;
             break;
@@ -179,10 +186,21 @@ int llwrite(int fd, char* buffer, int length) {
     // ACK handling
     while (tries < 3) {
         int temp = write(fd, trama, stuffed_index + 6);
-
         read_message(fd, ans);
 
-        if (ans[IBBC1] != ans[IADDR] ^ ans[ICTRL]) {
+        for(int i = 0; i <stuffed_index + 6 ; i++) {
+            printf("0x%02x \t", trama[i]);
+        }
+        printf("\n");
+        for(int i = 0; i < 5; i++) {
+            printf("0x%02x \t", ans[i]);
+        }
+        printf("\n");
+
+        printf("0x%02x \t", ans[IADDR] ^ ans[ICTRL]);
+        printf("0x%02x \n", ans[IBCC1]);
+
+        if ((ans[IADDR] ^ ans[ICTRL]) != ans[IBCC1]) {
             printf("ACK - BCC1 bad\n");
             tries++;
             continue;
@@ -210,7 +228,7 @@ int llwrite(int fd, char* buffer, int length) {
 
 
 // Estabelecer ligaçao
-int read_message(int fd, char * message) {
+int read_message(int fd, unsigned char * message) {
     int res, message_index = 0;
     while (alarm_flag == 0) {
         res = read(fd, message + message_index, 1);
