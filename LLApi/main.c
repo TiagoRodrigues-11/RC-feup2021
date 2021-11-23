@@ -70,22 +70,16 @@ int transmit(int fd, char * filename) {
     char read_data[PACKET_SIZE];
     int read_size;
 
-    int c = 0;
-
     while (true)
     {
         if (true) {
-            struct stat st;
-
-            stat(filename, &st);
-
-            printf("File size: %ld\n", st.st_size);
-
             read_size = 0;
 
             for (; read_size < PACKET_SIZE; read_size++) {
                 if (read(fd_file, read_data + read_size, 1) == 0) break;
             }
+
+            printf("read_size: %d\n",read_size);
 
             if (read_size == 0) {
                 printf("File over.\n");
@@ -97,13 +91,12 @@ int transmit(int fd, char * filename) {
             packet[L2] = (unsigned char) (read_size / 256);
             packet[L1] = (unsigned char) (read_size % 256);
 
-            printf("Last packet: 0x%02x\n", packet[read_size + 2]);
-
             memcpy(packet + D, read_data, read_size);
+
+            printf("Last packet: 0x%02x\n", packet[read_size + 3]);
         }
 
-        llwrite(fd, packet, read_size + 4);
-        c++;
+        llwrite(fd, packet, read_size + 5);
     }
     
 
@@ -122,8 +115,6 @@ int transmit(int fd, char * filename) {
 
 int receive(int fd) {
     int fd_file, status = WAITING;
-
-    int c = 0;
 
     while (true) {
         char packet[1024];
@@ -160,7 +151,6 @@ int receive(int fd) {
             close(fd_file);
             return -1;
         }
-        c++;
     }
 }
 
