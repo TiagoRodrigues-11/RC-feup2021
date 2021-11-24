@@ -66,6 +66,11 @@ int llopen(int port, int state) {
             if (!read_message(fd, message)) break;
         }
 
+        if (alarm_count >= 3) {
+            printf("llopen - timeout\n");
+            return -1;
+        }
+
         if ((message[ICTRL] ^ message[IADDR]) != message[IBCC1]) {
             printf("Parity error\n");
             return -1;
@@ -87,6 +92,10 @@ int llopen(int port, int state) {
     }
 
     alarm(0);
+
+    alarm_count = 0;
+    alarm_flag = 0;
+
     return fd;
 }
 
@@ -221,10 +230,20 @@ int llwrite(int fd, char* buffer, int length) {
     unsigned char ans[5];
     int tries = 0;
 
-    // ACK handling
+    // Write trama with ACK handling
     while (tries < 3) {
         int temp = write(fd, trama, stuffed_index + 6);
-        read_message(fd, ans);
+
+        alarm(3);
+
+        if (read_message(fd, ans) == 1) {
+            tries++;
+            alarm_flag = 0;
+            continue;
+        }
+
+        alarm(0);
+
         unsigned char t = (ans[IADDR] ^ ans[ICTRL]);
 
         if (t != ans[IBCC1]) {
@@ -257,8 +276,6 @@ int llwrite(int fd, char* buffer, int length) {
 
 }
 
-
-// Estabelecer ligaçao
 int read_message(int fd, unsigned char * message) {
     int res, message_index = 0;
     while (alarm_flag == 0) {

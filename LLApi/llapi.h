@@ -32,23 +32,19 @@ extern int alarm_flag;
 extern int alarm_count;
 
 
-/**
- * @brief establish the connection between 2 systems 
- * 
- */
+// Establish the connection between 2 systems
 int llopen(int fd, int state);
 
+// Close connection
 int llclose(int fd);
 
+// Read from serial port to buffer according to protocol
 int llread(int fd, char* buffer);
 
+// Write length number of bytes from buffer to serial port indicated by fd
 int llwrite(int fd, char* buffer, int length);
 
-
-/**
- * @brief Read and verification of the message
- * 
- */
+// Read supervision trama
 int read_message(int fd, unsigned char * message);
 
 

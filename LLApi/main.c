@@ -16,8 +16,8 @@
 #define FALSE 0
 #define TRUE 1
 #define PACKET_SIZE 256
-#define WAITING 0
-#define WRITING 1
+#define WAITING 0 // Waiting for a file to be transmitted
+#define WRITING 1 // Writing a file
 #define DATA 0x01
 #define START 0x02
 #define END 0x03
@@ -32,14 +32,16 @@ volatile int STOP=FALSE;
 int alarm_flag = 1;
 int alarm_count = 0;
 
+// Extract filename from a control packet
 void extract_filename(char * packet, char * filename) {
     int size = packet[1];
 
-    for (int i = 0; i < size; i++) {
+    for (int i = 0; i < size - 1; i++) {
         filename[i] = packet[2 + i];
     }
 }
 
+// Create a start control packet
 int make_start_packet(char * filename, char * packet) {
     char size = (char) (strlen(filename) + 1);
     packet[C] = START;
@@ -49,6 +51,7 @@ int make_start_packet(char * filename, char * packet) {
     return size + 2;
 }
 
+// Transmit file at filename path through serial port indicated by fd
 int transmit(int fd, char * filename) {
     int fd_file;
     struct stat file_stat;
@@ -56,16 +59,14 @@ int transmit(int fd, char * filename) {
     int size = make_start_packet(filename, packet), n = 0;
     char msg[256];
 
-    printf("%s\n", filename);
-
     if((fd_file = open(filename, O_RDWR)) < 0) perror("Error opening file: ");
 
-    printf("Writing file. Packet size: %d\n", PACKET_SIZE);
+    printf("Writing file: %s. Packet size: %d\n", filename, PACKET_SIZE);
 
-    // START
+    // START PACKET
     llwrite(fd, packet, size);
 
-    // DATA
+    // DATA PACKETS
     char read_data[PACKET_SIZE];
     int read_size;
 
@@ -99,7 +100,7 @@ int transmit(int fd, char * filename) {
     }
     
 
-    // END
+    // END PACKET
     size = make_start_packet(filename, packet);
     packet[C] = END;
 
@@ -112,13 +113,15 @@ int transmit(int fd, char * filename) {
     return 0;
 }
 
+// Receive a file through serial port indicate by file descriptor fd
 int receive(int fd) {
     int fd_file, status = WAITING;
 
     while (true) {
         char packet[1024];
         int bytes_read = llread(fd, packet);
-
+        
+        // If state machine is waiting for file and receives start packet
         if (status == WAITING && packet[C] == START) {
             char filename[256];
 
@@ -131,18 +134,21 @@ int receive(int fd) {
             status = WRITING;
         }
 
+        // If state machine is writing and receives an end packet
         else if (status == WRITING && packet[C] == END) {
             printf("Finished receiving\n");
             close(fd_file);
             return 0;
         }
 
+        // If state machine is writing and receives a data packet
         else if (status == WRITING && packet[C] == DATA) {
             unsigned char l2 = packet[L2], l1 = packet[L1];
             int res = l2 * 256 + l1;
             write(fd_file, packet + 4, res);
         }
 
+        // Otherwise
         else {
             printf("Catastrophe!\n");
             close(fd_file);
@@ -156,7 +162,13 @@ int main(int argc, char** argv)
     int fd, c, res, port;
     char buf[255];
 
-    int state = strcmp(argv[1], "T") == 0 ? TRANSMITER : RECEIVER;
+    int state;
+    if (strcmp(argv[1], "T") == 0) state = TRANSMITER;
+    else if (strcmp(argv[1], "R") == 0) state = RECEIVER;
+    else {
+        printf("Bad arguments\n");
+        exit(-1);
+    }
 
     if ((argc < 3 && state == RECEIVER) || (argc < 4 && state == TRANSMITER)) {
         printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
@@ -182,12 +194,8 @@ int main(int argc, char** argv)
     }
 
     printf("Closing\n");
-    llclose(fd);
 
-    /*
-    O ciclo WHILE deve ser alterado de modo a respeitar o indicado no guião
-    */
+    llclose(fd);
 
     return 0;
 }
-// End of file
