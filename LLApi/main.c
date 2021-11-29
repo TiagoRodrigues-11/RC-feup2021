@@ -95,7 +95,7 @@ int transmit(int fd, char * filename) {
             memcpy(packet + D, read_data, read_size);
         }
 
-        llwrite(fd, packet, read_size + 5);
+        if (llwrite(fd, packet, read_size + 5) < 0) return -1;
         c++;
     }
     
