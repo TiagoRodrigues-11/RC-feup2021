@@ -112,6 +112,9 @@ int llread(int fd, char* buffer) {
 
     while (true)
     {
+        trama_index = 0;
+        stuffed_size = 0;
+        destuffed_size = 0;
         while(true) {
             int res = read(fd, trama + trama_index, 1);
             
@@ -232,11 +235,13 @@ int llwrite(int fd, char* buffer, int length) {
 
     // Write trama with ACK handling
     while (tries < 3) {
+        alarm(0);
         int temp = write(fd, trama, stuffed_index + 6);
 
         alarm(3);
 
         if (read_message(fd, ans) == 1) {
+            printf("Read message failed\n");
             tries++;
             alarm_flag = 0;
             continue;
@@ -247,6 +252,7 @@ int llwrite(int fd, char* buffer, int length) {
         unsigned char t = (ans[IADDR] ^ ans[ICTRL]);
 
         if (t != ans[IBCC1]) {
+            printf("BCC1 failed\n");
             tries++;
             continue;
         }
@@ -254,6 +260,8 @@ int llwrite(int fd, char* buffer, int length) {
         t = REJ(llwrite_start ? 0 : 1);
 
         if (ans[ICTRL] == t) {
+            printf("REJ\n");
+            tcflush(fd, TCIOFLUSH);
             tries++;
             continue;
         }
@@ -271,6 +279,8 @@ int llwrite(int fd, char* buffer, int length) {
     free(trama);
     free(unstuffed);
     free(stuffed);
+    
+    alarm(0);
 
     return tries >= 3 ? -1 : stuffed_index + 6;
 
