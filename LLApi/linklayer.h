@@ -19,6 +19,7 @@
 #define RECEIVER 0x00
 #define TRANSMITER 0x01
 #define FLAG 0x7E
+#define DISC 0x0B
 #define SET 0x03
 #define UA 0x07
 #define ADDR 0x03
@@ -30,7 +31,7 @@
 
 extern int alarm_flag;
 extern int alarm_count;
-
+extern int state;
 
 // Establish the connection between 2 systems
 int llopen(int fd, int state);

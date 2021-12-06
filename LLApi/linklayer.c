@@ -58,12 +58,14 @@ int llopen(int port, int state) {
     if (state == TRANSMITER) {
         while (alarm_count < 3) {
             if (alarm_flag == 1) {
+                
                 write(fd, message, 5);
                 alarm(3);
+                
                 alarm_flag = 0;
             }
-
             if (!read_message(fd, message)) break;
+            tcflush(fd, TCIOFLUSH);
         }
 
         if (alarm_count >= 3) {
@@ -89,6 +91,9 @@ int llopen(int port, int state) {
         message[IBCC1] = message[ICTRL] ^ message[IADDR];
 
         write(fd, message, 5);
+    } else {
+        printf("Bad state!\n");
+        return -1;
     }
 
     alarm(0);
@@ -96,12 +101,55 @@ int llopen(int port, int state) {
     alarm_count = 0;
     alarm_flag = 0;
 
-    return fd;
+    return fd;struct termios oldtio,newtio;
+
+char llwrite_start = 0;
+char llread_start = 1;
 }
 
 int llclose(int fd) {
+
+    
+    if(state == TRANSMITER) {
+        char msg_tr[5] = {FLAG, ADDR, DISC, ADDR ^ DISC ,FLAG};
+        char msg_re[5];
+        write(fd, msg_tr, 5);
+        read_message(fd, msg_re);
+
+        if((msg_re[IADDR] ^ msg_re[ICTRL]) != msg_re[IBCC1]) {
+            printf("BCC1 bad!\n");
+            return -1;
+        } 
+        char msg_ua[5] = {FLAG, ADDR, UA, ADDR ^ UA ,FLAG};
+
+        write(fd, msg_ua, 5);
+
+
+    } else if (state == RECEIVER) {
+        char msg_tr[5] = {FLAG, ADDR, DISC, ADDR ^ DISC ,FLAG};
+        char msg_re[5];
+        read_message(fd, msg_re);
+        
+        if((msg_re[IADDR] ^ msg_re[ICTRL]) != msg_re[IBCC1]) {
+            printf("BCC1 bad!\n");
+            return -1;
+        } 
+
+        write(fd, msg_tr, 5);
+        
+        read_message(fd, msg_re);
+        
+        if((msg_re[IADDR] ^ msg_re[ICTRL]) != msg_re[IBCC1]) {
+            printf("BCC1 bad!\n");
+            return -1;
+        } 
+    } else {
+        return -1;
+    }
+    printf("Closing FD!\n");
     tcsetattr(fd,TCSANOW,&oldtio);
     close(fd);
+    return 0;
 }
 
 int llread(int fd, char* buffer) {
@@ -290,11 +338,18 @@ int read_message(int fd, unsigned char * message) {
     int res, message_index = 0;
     while (alarm_flag == 0) {
         res = read(fd, message + message_index, 1);
+        if(res < 0) continue;
         if (message[message_index] != FLAG && message_index == 0) continue;
+        else if (message[message_index] == FLAG && message_index == 1) {
+            message_index = 1;
+            message[0] = FLAG;
+            continue;
+        }
         else if (message[message_index] == FLAG && message_index == 4) {
             message_index = 0;
             return 0;
         }
+        else if (message_index >= 4) return -1;
         else {
             message_index++;
         }

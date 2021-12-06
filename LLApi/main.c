@@ -29,6 +29,7 @@
 
 volatile int STOP=FALSE;
 
+int state;
 int alarm_flag = 1;
 int alarm_count = 0;
 
@@ -166,7 +167,6 @@ int main(int argc, char** argv)
     int fd, c, res, port;
     char buf[255];
 
-    int state;
     if (strcmp(argv[1], "T") == 0) state = TRANSMITER;
     else if (strcmp(argv[1], "R") == 0) state = RECEIVER;
     else {
@@ -196,8 +196,6 @@ int main(int argc, char** argv)
     } else {
         receive(fd);
     }
-
-    printf("Closing\n");
 
     llclose(fd);
 
