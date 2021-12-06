@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "llapi.h"
+#include "linklayer.h"
 
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
