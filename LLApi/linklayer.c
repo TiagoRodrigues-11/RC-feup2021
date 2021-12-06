@@ -111,6 +111,9 @@ int llclose(int fd) {
 
     
     if(state == TRANSMITER) {
+        /*
+            Write a DISC, read a DISC and write a UA to check if it is OK
+        */
         char msg_tr[5] = {FLAG, ADDR, DISC, ADDR ^ DISC ,FLAG};
         char msg_re[5];
         write(fd, msg_tr, 5);
@@ -126,6 +129,9 @@ int llclose(int fd) {
 
 
     } else if (state == RECEIVER) {
+        /*
+            Read a DISC, write a DISC and receive a UA to check if it is OK
+        */
         char msg_tr[5] = {FLAG, ADDR, DISC, ADDR ^ DISC ,FLAG};
         char msg_re[5];
         read_message(fd, msg_re);

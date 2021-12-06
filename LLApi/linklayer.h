@@ -33,19 +33,51 @@ extern int alarm_flag;
 extern int alarm_count;
 extern int state;
 
-// Establish the connection between 2 systems
-int llopen(int fd, int state);
+/**
+ * Establish the connection between 2 systems
+ * 
+ * @param port Number of port
+ * @param state State: Transmiter/Receiver
+ * @return int -1 in case of error, 0 otherwise
+ */
+int llopen(int port, int state);
 
-// Close connection
+
+/**
+ * Close connection
+ * 
+ * @param fd File Descriptor
+ * @return int -1 in case of error , 0 otherwise
+ */
 int llclose(int fd);
 
-// Read from serial port to buffer according to protocol
+/**
+ * Read from serial port to buffer according to protocol
+ * 
+ * @param fd File Descriptor
+ * @param buffer Buffer to write to
+ * @return int 
+ */
 int llread(int fd, char* buffer);
 
-// Write length number of bytes from buffer to serial port indicated by fd
+
+/**
+ * Write length number of bytes from buffer to serial port indicated by fd
+ * 
+ * @param fd File Descriptor
+ * @param buffer Buffer to read from
+ * @param length NUmber of bytes from buffer to read
+ * @return int -1 in case of error, 0 otherwise
+ */
 int llwrite(int fd, char* buffer, int length);
 
-// Read supervision trama
+/**
+ * Read supervision trama
+ * 
+ * @param fd File Descriptor
+ * @param message message to write to 
+ * @return int -1 in case of error, 0 otherwise
+ */
 int read_message(int fd, unsigned char * message);
 
 

@@ -33,7 +33,13 @@ int state;
 int alarm_flag = 1;
 int alarm_count = 0;
 
-// Extract filename from a control packet
+
+/**
+ * Extract filename from a control packet
+ * 
+ * @param packet Packet to read filename
+ * @param filename Name of file
+ */
 void extract_filename(char * packet, char * filename) {
     int size = packet[1];
 
@@ -42,7 +48,13 @@ void extract_filename(char * packet, char * filename) {
     }
 }
 
-// Create a start control packet
+/**
+ * Create a start control packet
+ * 
+ * @param filename Name of file
+ * @param packet Start packet 
+ * @return int Size of Packet
+ */
 int make_start_packet(char * filename, char * packet) {
     char size = (char) (strlen(filename) + 1);
     packet[C] = START;
@@ -52,7 +64,14 @@ int make_start_packet(char * filename, char * packet) {
     return size + 2;
 }
 
-// Transmit file at filename path through serial port indicated by fd
+
+/**
+ * Transmit file at filename path through serial port indicated by fd
+ * 
+ * @param fd File Descriptor
+ * @param filename Name of file
+ * @return int -1 in case of error, 0 otherwise
+ */
 int transmit(int fd, char * filename) {
     int fd_file;
     struct stat file_stat;
@@ -118,7 +137,12 @@ int transmit(int fd, char * filename) {
     return 0;
 }
 
-// Receive a file through serial port indicate by file descriptor fd
+/**
+ * Receive a file through serial port indicate by file descriptor fd
+ * 
+ * @param fd File Descriptor
+ * @return int -1 in case of error , 0 otherwise
+ */
 int receive(int fd) {
     int fd_file, status = WAITING;
 
@@ -166,16 +190,24 @@ int main(int argc, char** argv)
 {
     int fd, c, res, port;
     char buf[255];
+    // Case: lesser arguments than should have
+    if(argc < 3) {
+        printf("./llapi T/R port_number [file to transfer]\n");
+        exit(1);
+    }
 
+    // Get the transmiter/receiver state
     if (strcmp(argv[1], "T") == 0) state = TRANSMITER;
     else if (strcmp(argv[1], "R") == 0) state = RECEIVER;
     else {
-        printf("Bad arguments\n");
+        printf("Bad arguments!\n");
+        printf("./llapi T/R port_number [file to transfer]\n");
         exit(-1);
     }
 
     if ((argc < 3 && state == RECEIVER) || (argc < 4 && state == TRANSMITER)) {
-        printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
+        printf("Bad arguments!\n");
+        printf("./llapi T/R port_number [file to transfer]\n");
         exit(1);
     }
 
@@ -185,18 +217,17 @@ int main(int argc, char** argv)
 
     // Establish connection
        
-    fd = llopen(port, state);
-
-    if (fd < 0) exit(-1);
-
+    if ((fd = llopen(port, state)) < 0) exit(-1);
     printf("Establish connection\n");
 
+    // Starting writing/reading packet from file
     if(state == TRANSMITER) {
         transmit(fd, argv[3]);
     } else {
         receive(fd);
     }
 
+    // Close Connection
     llclose(fd);
 
     return 0;
