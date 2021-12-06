@@ -10,7 +10,7 @@
 #include <string.h>
 #include <stdbool.h>
 
-#include "llapi.h"
+#include "linklayer.h"
 
 #define BAUDRATE B38400
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
