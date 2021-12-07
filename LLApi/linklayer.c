@@ -298,6 +298,7 @@ int llwrite(int fd, char* buffer, int length) {
             printf("Read message failed\n");
             tries++;
             alarm_flag = 0;
+            if (tries >= 3) exit(1);
             continue;
         }
 
