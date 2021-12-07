@@ -154,6 +154,8 @@ int receive(int fd) {
         if (status == WAITING && packet[C] == START) {
             char filename[256];
 
+            memset(filename, 0, 256);
+
             extract_filename(packet, filename);
 
             unlink(filename);
