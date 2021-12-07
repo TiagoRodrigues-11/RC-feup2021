@@ -103,9 +103,7 @@ int transmit(int fd, char * filename) {
 
 
             if (read_size == 0) {
-                alarm(0);
                 printf("File over.\n");
-                alarm(0);
                 break;
             }
 
@@ -127,8 +125,6 @@ int transmit(int fd, char * filename) {
     packet[C] = END;
 
     llwrite(fd, packet, size);
-    
-    alarm(0);
 
     printf("Finished writing file\n");
 
