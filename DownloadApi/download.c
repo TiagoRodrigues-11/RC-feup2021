@@ -61,11 +61,9 @@ int main(int argc, char ** argv) {
         exit(-1);
     }
 
-    printf("%s\n", host_struct->h_addr);
-
     int sockfd;
     struct sockaddr_in server_addr;
-    char buf[] = "user anonymous\n";
+    char buf[] = "user anonymous\r\n";
     size_t bytes;
 
     /*server address handling*/
@@ -102,7 +100,7 @@ int main(int argc, char ** argv) {
 
     char ans[256];
 
-    read(sockfd, ans, 256);
+    read(sockfd, ans, 255);
 
     printf("%s\n", ans);
 

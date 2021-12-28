@@ -43,7 +43,7 @@ int main(int argc, char **argv) {
     }
 
     /*send a string to the server*/
-    bytes = write(sockfd, buf, strlen(buf));
+    bytes = send(sockfd, buf, strlen(buf), 0);
     if (bytes > 0)
         printf("Bytes escritos %ld\n", bytes);
     else {
