@@ -56,12 +56,12 @@ int main(int argc, char ** argv) {
 
     struct hostent *host_struct;
 
-    printf("%s\n", host);
-
     if ((host_struct = gethostbyname(host)) == NULL) {
         herror("gethostbyname()");
         exit(-1);
     }
+
+    printf("%s\n", host_struct->h_addr);
 
     int sockfd;
     struct sockaddr_in server_addr;
