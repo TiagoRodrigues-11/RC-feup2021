@@ -98,10 +98,9 @@ int main(int argc, char ** argv) {
         exit(-1);
     }
 
-    char ans[256];
-    int n = 0;
+    char ans[1024];
 
-    while(read(sockfd, &ans[n], 1) > 0) n++;
+    read(sockfd, ans, 1023);
 
     printf("%s\n", ans);
 
