@@ -57,7 +57,7 @@ int main(int argc, char ** argv) {
     struct hostent *host_struct;
 
     if ((host_struct = gethostbyname(host)) == NULL) {
-        perror("gethostbyname()");
+        herror("gethostbyname()");
         exit(-1);
     }
 
