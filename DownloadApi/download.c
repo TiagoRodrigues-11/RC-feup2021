@@ -71,7 +71,7 @@ int main(int argc, char ** argv) {
     /*server address handling*/
     bzero((char *) &server_addr, sizeof(server_addr));
     server_addr.sin_family = AF_INET;
-    server_addr.sin_addr.s_addr = inet_addr(host_struct->h_addr);    /*32 bit Internet address network byte ordered*/
+    server_addr.sin_addr.s_addr = inet_addr(inet_ntoa(*((struct in_addr *) host_struct->h_addr))));    /*32 bit Internet address network byte ordered*/
     server_addr.sin_port = htons(21);        /*server TCP port must be network byte ordered */
 
     /*open a TCP socket*/
