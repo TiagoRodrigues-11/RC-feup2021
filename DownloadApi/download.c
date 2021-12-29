@@ -7,21 +7,83 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <unistd.h>
+#include <termios.h>
+#include <fcntl.h>
+#include <stdbool.h>
+#include <sys/wait.h>
 
 struct User {
-    char name[256];
-    char password[256];
+    char * name;
+    char * password;
 };
 
+enum message_type {
+    USER,
+    PASS,
+    PASV,
+    RETR
+};
+
+int send_message(int sockfd, enum message_type type, char * info) {
+    char buffer[256];
+    memset(buffer, 0, sizeof(buffer));
+
+    switch (type)
+    {
+    case USER:
+        snprintf(buffer, sizeof(buffer), "user %s\r\n", info);
+        break;
+    case PASS:
+        snprintf(buffer, sizeof(buffer), "pass %s\r\n", info);
+        break;
+    case PASV:
+        snprintf(buffer, sizeof(buffer), "pasv\r\n");
+        break;
+    case RETR:
+        snprintf(buffer, sizeof(buffer), "retr %s\r\n", info);
+        break;
+    default:
+        break;
+    }
+
+    printf("%s\n", buffer);
+
+    return send(sockfd, buffer, strlen(buffer), 0);
+}
+
+int check_response(char * response, enum message_type type) {
+    switch (type)
+    {
+    case USER:
+        return strcmp("331 Please specify the password.\r\n", response) == 0;
+    case PASS:
+        return strcmp("230 Login successful.\r\n", response) == 0;
+    case PASV:
+        return strstr(response, "227 Entering Passive Mode") != NULL;
+    case RETR:
+        return strstr(response, "150 Opening BINARY mode data connection for") != NULL;
+    default:
+        return 0;
+    }
+}
+
+int send_and_check_message(int sockfd, enum message_type type, char * info, char * ans, size_t ans_size) {
+    memset(ans, 0, ans_size);
+    send_message(sockfd, type, info);
+    recv(sockfd, ans, ans_size - 1, 0);
+    printf("%s\n", ans);
+    return check_response(ans, type);
+}
+
 void print_usage() {
-    printf("Something\n");
+    printf("ftp://[<user>:<password>@]<host>/<url-path>\n");
 }
 
 int main(int argc, char ** argv) {
     if (argc < 2)
         print_usage();
 
-    char info[256];
+    char info[256], temp[256];
 
     strncpy(info, argv[1] + 6, strlen(argv[1]) - 5);
 
@@ -36,8 +98,10 @@ int main(int argc, char ** argv) {
     int info_index = 0;
 
     if ((at = strstr(info, "@")) != NULL) {
-        //DO SOMETHING
-        //ALTER NDEX
+        strcpy(temp, info);
+        user.name = strtok(temp, ":");
+        user.password = strtok(NULL, "@");
+        strcpy(info, at+1);
     }
 
     while(info[info_index] != '/') {
@@ -63,7 +127,7 @@ int main(int argc, char ** argv) {
 
     int sockfd;
     struct sockaddr_in server_addr;
-    char buf[] = "user anonymous\r\n";
+    char buf[256];
     size_t bytes;
 
     /*server address handling*/
@@ -86,23 +150,95 @@ int main(int argc, char ** argv) {
         exit(-1);
     }
 
-    bytes = write(sockfd, buf, strlen(buf));
-    if (bytes > 0)
-        printf("Bytes escritos %ld\n", bytes);
-    else {
-        perror("write()");
-        exit(-1);
-    }
-    if (close(sockfd)<0) {
-        perror("close()");
-        exit(-1);
+    char ans[2048];
+    int status;
+    bool over = false;
+
+    while (!over && (status = recv(sockfd, ans, 2047, 0)) > 0) {
+        printf("%s", ans);
+        if(ans[status - 3] == 32) over = true;
+        memset(ans, 0, sizeof(ans));
     }
 
-    char ans[1024];
+    send_and_check_message(sockfd, USER, user.name, ans, sizeof(ans));
 
-    read(sockfd, ans, 1023);
+    send_and_check_message(sockfd, PASS, user.password, ans, sizeof(ans));
 
-    printf("%s\n", ans);
+    send_and_check_message(sockfd, PASV, NULL, ans, sizeof(ans));
+
+    int n0, n1;
+
+    sscanf(ans, "227 Entering Passive Mode (%*d,%*d,%*d,%*d,%d,%d)\r\n", &n0, &n1);
+
+    int port = n0 * 256 + n1;
+    int id;
+
+    switch ((id = fork()))
+    {
+    case 0:
+        bzero((char *) &server_addr, sizeof(server_addr));
+        server_addr.sin_family = AF_INET;
+        server_addr.sin_addr.s_addr = inet_addr(inet_ntoa(*((struct in_addr *) host_struct->h_addr)));    /*32 bit Internet address network byte ordered*/
+        server_addr.sin_port = htons(port);        /*server TCP port must be network byte ordered */
+
+        /*open a TCP socket*/
+        if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+            perror("socket()");
+            exit(-1);
+        }
+
+        /*connect to the server*/
+        if (connect(sockfd,
+                    (struct sockaddr *) &server_addr,
+                    sizeof(server_addr)) < 0) {
+            perror("connect()");
+            exit(-1);
+        }
+
+        char filename[256];
+
+        int info_index = 0, filename_index = 0;
+        while(1){
+            char c = info[info_index++];
+            if(c == '\0') break;
+            if(c == '/') {
+                memset(filename, 0, sizeof(filename));
+                filename_index = 0;
+                continue;
+            }
+            filename[filename_index] = c;
+            filename_index++;
+        }
+
+        printf("%s\n", filename);
+
+        char packet[256];
+        int bytes;
+
+        int file_fd = open(filename, O_WRONLY | O_CREAT | O_TRUNC, 0777);
+
+        while((bytes = recv(sockfd, packet, 256, 0)) > 0) {
+            write(file_fd, packet, bytes);
+        }
+
+        close(file_fd);
+
+        break;    
+    default:
+        send_message(sockfd, RETR, path);
+
+        memset(ans, 0, 2048);
+
+        waitpid(id, NULL, 0);
+
+        sleep(1);
+
+        recv(sockfd, ans, 2047, 0);
+
+        printf("%s\n", ans);
+
+        break;
+    }
 
     return 0;
 }
