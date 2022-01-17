@@ -24,6 +24,19 @@ enum message_type {
     RETR
 };
 
+char * read_response(int sockfd) {
+    char * ans = malloc(2048);
+    size_t n = 0;
+    FILE * fp = fdopen(sockfd, "r");
+    while (getline(&ans, &n, fp) != - 1)
+    {
+        printf("%s", ans);
+        if(ans[3] == ' ') break;
+    }
+
+    return ans;
+}
+
 int send_message(int sockfd, enum message_type type, char * info) {
     char buffer[256];
     memset(buffer, 0, sizeof(buffer));
@@ -67,12 +80,15 @@ int check_response(char * response, enum message_type type) {
     }
 }
 
-int send_and_check_message(int sockfd, enum message_type type, char * info, char * ans, size_t ans_size) {
-    memset(ans, 0, ans_size);
+char * send_and_check_message(int sockfd, enum message_type type, char * info) {
     send_message(sockfd, type, info);
-    recv(sockfd, ans, ans_size - 1, 0);
-    printf("%s\n", ans);
-    return check_response(ans, type);
+    char * ans = read_response(sockfd);
+    if (check_response(ans, type)) {
+        return ans;
+    } else {
+        free(ans);
+        return NULL;
+    }
 }
 
 void print_usage() {
@@ -103,6 +119,8 @@ int main(int argc, char ** argv) {
         user.password = strtok(NULL, "@");
         strcpy(info, at+1);
     }
+
+    printf("Username: %s, Password: %s\n", user.name, user.password);
 
     while(info[info_index] != '/') {
         host[host_index] = info[info_index];
@@ -150,32 +168,48 @@ int main(int argc, char ** argv) {
         exit(-1);
     }
 
-    char ans[2048];
+    char * ans;
     int status;
     bool over = false;
 
-    while (!over && (status = recv(sockfd, ans, 2047, 0)) > 0) {
-        printf("%s", ans);
-        if(ans[status - 3] == 32) over = true;
-        memset(ans, 0, sizeof(ans));
-    }
+    printf("Beginning conection\n");
 
-    send_and_check_message(sockfd, USER, user.name, ans, sizeof(ans));
+    if ((ans = read_response(sockfd)) == NULL) exit(-1);
 
-    send_and_check_message(sockfd, PASS, user.password, ans, sizeof(ans));
+    free(ans);
 
-    send_and_check_message(sockfd, PASV, NULL, ans, sizeof(ans));
+    printf("Connection established. Logging in\n");
+
+    if ((ans = send_and_check_message(sockfd, USER, user.name)) == NULL) exit(-1);
+
+    free(ans);
+
+    if ((ans = send_and_check_message(sockfd, PASS, user.password)) == NULL) exit(-1);
+
+    free(ans);
+
+    printf("Logged in. Entering passive mode\n");
+
+    if ((ans = send_and_check_message(sockfd, PASV, NULL)) == NULL) exit(-1);
 
     int n0, n1;
 
+    printf("Ans: %s\n", ans);
+
     sscanf(ans, "227 Entering Passive Mode (%*d,%*d,%*d,%*d,%d,%d)\r\n", &n0, &n1);
+
+    free(ans);
 
     int port = n0 * 256 + n1;
     int id;
 
+    printf("n0: %d, n1: %d, port: %d\n", n0, n1, port);
+
     switch ((id = fork()))
     {
     case 0:
+        printf("Downloader proccess started\n");
+
         bzero((char *) &server_addr, sizeof(server_addr));
         server_addr.sin_family = AF_INET;
         server_addr.sin_addr.s_addr = inet_addr(inet_ntoa(*((struct in_addr *) host_struct->h_addr)));    /*32 bit Internet address network byte ordered*/
@@ -195,6 +229,8 @@ int main(int argc, char ** argv) {
             exit(-1);
         }
 
+        printf("Downloader: Connection established\n");
+
         char filename[256];
 
         int info_index = 0, filename_index = 0;
@@ -210,7 +246,7 @@ int main(int argc, char ** argv) {
             filename_index++;
         }
 
-        printf("%s\n", filename);
+        printf("Downloader: Filename: %s\n", filename);
 
         char packet[256];
         int bytes;
@@ -221,13 +257,18 @@ int main(int argc, char ** argv) {
             write(file_fd, packet, bytes);
         }
 
+        printf("Downloader: File downloaded\n");
+
         close(file_fd);
 
         break;    
     default:
+        printf("Parent: sending RETR message\n");
         send_message(sockfd, RETR, path);
 
         memset(ans, 0, 2048);
+
+        printf("Parent: Waiting for downloader to terminate\n");
 
         waitpid(id, NULL, 0);
 
